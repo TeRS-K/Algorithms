@@ -1,0 +1,606 @@
+λ - Calculus Notes
+
+Section 1. Logic Operators 
+
+1.1 True / False / (True? b)
+
+1.1.1 True / False
+
+    TRUE = λ x. λ y. x
+    FALSE = λ x. λ y. y
+we think of true / false as making a choice between doing two things, 
+so we provide x y and choose the first one when its true, otherwise 
+false.  
+
+equivalently, in Racket:
+    (define True (λ (yes) (λ (no) yes)))
+    (define False (λ (yes) (λ (no) no)))
+
+ex. define the NOT operator which takes in true and returns FALSE 
+                               or takes in false and returns TRUE
+λ expression:
+    λ b. b FALSE TRUE
+
+eg. > (λ b. b FALSE TRUE) TRUE
+      FALSE
+&stepper&:
+    (λ b.b FALSE TRUE) TRUE
+  > TRUE FALSE TRUE
+  > (λ x. λ y. x) FALSE TRUE
+  > FALSE
+
+Racket:  
+    (define NOT 
+      (λ (b) b False True)) 
+
+eg. > NOT True
+      False
+
+----------------------------------------------------------------------------
+
+1.1.2 (True? b)
+
+ex. define (True? b) function where b is a boolean that returns ‘yes
+if it's true or 'no if it's false
+
+Racket:
+(define (True? b)
+  ((b 'yes) 'no))    
+
+eg. > (True? False)
+      no
+&stepper&:
+    (True? False)
+ >  ((False 'yes) 'no)
+ >  (((λ (yes) (λ (no) no)) 'yes) 'no)
+ >  ((λ (no) no) 'no)
+ >  'no
+
+explanation: on the third line of stepper, we pass in 'yes to the λ 
+function (λ (yes) (λ (no) no)) and this function returns (λ (no) no)
+no matter what the value was passed in.
+
+=======================================================================
+
+1.2 If / Or / And / Not
+
+1.2.1 If
+
+Racket: 
+(define (If test thenpart elsepart)
+  ((test thenpart) elsepart))
+
+explanation: the if statement is similar to (True? b) in 1.1 because
+test is going to be a boolean which returns either true or false.
+If test is true, If returns the first argument thenpart;
+if test is false, If returns the second argument elsepart.
+
+----------------------------------------------------------------------------
+
+1.2.2 Or
+
+Racket:
+(define (Or a b)
+  (If a True b))
+
+explanation: the Or function uses If statement defined in 1.2.1.
+(Or a b) returns true when either a or b is true or when both are true; 
+returns false when both a and b are false. Now let's look at the If 
+statement. (note that both a and b are boolean values) If a is true, 
+we returns true immediately, if a is false, we check returns b. 
+So if b is true, it means that a is false and b is true which returns 
+true. If b is false too, then a and b are both false, the statement 
+returns False. 
+Note that for the case where a and b are both true, as long as we know 
+that a is true, the value of b does not matter anymore. 
+
+----------------------------------------------------------------------------
+
+1.2.3 And
+
+Racket: 
+(define (And a b)
+  (If a b False))
+
+explanation: the And function also uses If statement defined in 1.2.1.
+(And a b) returns true when both a and b are true and false otherwise.
+Now let's look at the If statement. If a is true, we want to check if b
+is and also true, so we simply return the boolean value of b. Otherwise,
+if a is true, then the function must return false.
+
+----------------------------------------------------------------------------
+
+1.2.4 Not
+
+Racket:
+(define (Not a)
+  (If a False True))
+
+explanation: this is the exact same thing as 1.1.2 except that it uses 
+If statement.
+
+
+########################################################################
+
+Section 2. Y - Combinator
+
+2.1 Simple Loops
+
+consider the mathematical equation: 
+                    loop = loop
+when you ask what is the value of loop or how do you execute loop,
+it goes to the right-hand side which is a loop and it comes back 
+to the left again. Basically, it just goes around forever in a circle.
+
+λ expression:
+(λ x. x x) (λ x. x x)
+
+explanation: the first λ term is the function and the second λ term 
+gets substitute into the first one as x, which gives a copy of pairs
+of x, which is again (λ x. x x) (λ x. x x).
+
+=======================================================================
+
+2.2 Recursion
+
+Def'n of Recursion:
+Rec f = f (Rec f)
+      = f (f (Rec f))
+      = f (f (f (f (f (...))
+
+λ expression:
+λ f. (λ x. f(x x)) (λ x. f(x x))
+
+(λ f. (λ x. f(x x)) (λ x. f(x x))) F
+ > (λ x. F(x x)) (λ x. F(x x))
+
+explanation: similar to 2.1 except that this time we apply the function
+to the repeating x x.
+
+Racket:
+(define Y 
+  (λ (f)
+    ((λ (self) (f (self self)))
+     (λ (self) (f (self self))))))
+
+lazy racket:
+(define Y 
+  (λ (f) 
+    (f (Y f))))
+
+2.3 Examples
+
+2.3.1 Factorial
+
+LAZY EVALUATION:
+in lazy Racket:
+(define Y (lambda (f) (f (Y f))))
+(define almost-factorial 
+  (lambda (f)
+    (lambda (n)
+      (if (= n 0)
+          1
+          (* n (f (sub1 n)))))))
+(define factorial (Y almost-factorial))
+
+eg. (factorial 3) = 6
+&stepper&:
+(factorial 3)
+ > ((Y almost-factorial) 3)
+ > ((almost-factorial (Y almost-factorial)) 3)
+ > ((almost-factorial 
+      (almost-factorial 
+        (almost-factorial)
+          (...))) 3)
+ > ((lambda (n)
+      (if (= n 0)
+          1
+          (* n ((almost-factorial)
+                  (Y almost-factorial) (sub1 n)))))3)
+ > (if (= 3 0)
+       1
+       (* 3 ((almost-factorial)
+                (Y almost-factorial) 2)))
+ > (* 3 ((almost-factorial)
+           (Y almost-factorial) 2)))   
+ > (* 3 ((lambda (n)
+           (if (= n 0)
+              1
+              (* n ((almost-factorial)
+                       (Y almost-factorial) (sub1 n))))) 2))
+ > (* 3 (if (= 2 0)
+            1
+            (* 2 ((almost-factorial)
+                     (Y almost-factorial) 1))))
+ > (* 3 (* 2 ((almost-factorial)
+                 (Y almost-factorial) 1)))
+ > (* 3 (* 2 ((lambda (n)
+                 (if (= n 0)
+                     1
+                     (* n ((almost-factorial)
+                              (Y almost-factorial) (sub1 n))))) 1)))
+ > (* 3 (* 2 (if (= 1 0)
+                 1
+                 (* 1 ((almost-factorial)
+                          (Y almost-factorial) 0)))))
+ > (* 3 (* 2 (* 1 ((almost-factorial)
+                      (Y almost-factorial) 0))))
+ > (* 3 (* 2 (* 1 ((lambda (n)
+                      (if (= n 0)
+                          1
+                          (* n ((almost-factorial)
+                                (Y almost-factorial) (sub1 n))))) 0))))
+ > (* 3 (* 2 (* 1 (if (= 0 0)
+                      1
+                      (* 0 ((almost-factorial)
+                                (Y almost-factorial) -1))))))
+ > (* 3 (* 2 (* 1 1)))
+ > 6
+
+
+########################################################################
+
+Section 3. List Abbrev. & Nat
+
+3.1 Cons / Car / Cdr / Empty
+
+3.1.1 Cons
+
+Racket:
+(define (Cons car cdr)
+  (λ (selector) ((selector car) cdr)))
+
+eg. (Cons 1 (Cons 2 3))
+&stepper&:
+ > (λ (selector)
+     ((selector 1)
+       (λ (selector) ((selector 2) 3))))
+ 
+explanation: consider (Cons a b) itself as a λ function as above,
+we'll see how its being used when we look at the implementation of 
+Car and Cdr.
+
+----------------------------------------------------------------------------
+
+3.1.2 Car / Cdr
+
+Racket:
+(define (Car pair) (pair True))
+(define (Cdr pair) (pair False))
+
+explanation: we put boolean values as the input for the λ function
+from Cons, so that if we put True, it gives the first argument (ie. Car), 
+if we put False, it gives the second argument (ie. Cdr).
+
+eg. (define a (Cons 1 (Cons 2 3)))
+    (Car a) -> 1
+    (Cdr a) -> #<procedure:...>
+    (Car (Cdr a)) -> 2
+    (Cdr (Cdr a)) -> 3
+
+(Car a) -> 1
+&stepper&: (Car a)
+ > ((Cons 1 (Cons 2 3)) True)
+ > ((λ (selector)
+      ((selector 1)
+        (λ (selector) ((selector 2) 3))))
+          True)
+ > ((True 1)
+        (λ (selector) ((selector 2) 3)))
+ > (((λ (yes) (λ (no) yes)) 1)
+        (λ (selector) ((selector 2) 3)))
+ > ((λ (no) 1) 
+       (λ (selector) ((selector 2) 3)))
+ > 1
+
+
+(Cdr a) -> #<procedure:...>
+&stepper&: (Cdr a)
+ > ((Cons 1 (Cons 2 3)) False)
+ > ((λ (selector)
+      ((selector 1)
+        (λ (selector) ((selector 2) 3))))
+          False)
+ > ((False 1)
+        (λ (selector) ((selector 2) 3)))
+ > (((λ (yes) (λ (no) no)) 1)
+        (λ (selector) ((selector 2) 3)))
+ > ((λ (no) no) 
+       (λ (selector) ((selector 2) 3)))
+ > (λ (selector) ((selector 2) 3))
+ 
+
+(Car (Cdr a))
+&stepper&: (Car (Cdr a))
+ > (Car (λ (selector) ((selector 2) 3)))
+ > ((λ (selector) ((selector 2) 3)) True)
+ > ((True 2) 3)
+ > (((λ (yes) (λ (no) yes)) 2) 3)
+ > ((λ (no) 2) 3)
+ > 2
+
+
+(Cdr (Cdr a))
+&stepper&: (Cdr (Cdr a))
+ > (Cdr (λ (selector) ((selector 2) 3)))
+ > ((λ (selector) ((selector 2) 3)) False)
+ > ((False 2) 3)
+ > (((λ (yes) (λ (no) no)) 2) 3)
+ > ((λ (no) no) 3)
+ > 3
+
+----------------------------------------------------------------------------
+
+3.1.3 Empty / Empty?
+
+Racket:
+(define Empty (λ (x) True))
+(define (Empty? lst)
+  (lst (λ (yes) (λ (no) False))))
+
+eg. 
+(True? (Empty? Empty)) -> 'yes
+(True? (Empty? (Cons 5 Empty))) -> 'no
+
+(True? (Empty? Empty))
+&stepper&: (True? (Empty? Empty))
+ > (True? (Empty? (λ (x) True)))
+ > (True? (((λ (x) True)) 
+             (λ (yes) (λ (no) False))))
+ > (True? True)
+ > 'yes
+
+explanation: consider the lambda expression given by Empty,
+(λ (x) True), it means that no matter what the input is, it always gives
+True. Therefore, when the list is empty, Empty? always returns true.
+
+(True? (Empty? (Cons 5 2)))
+&stepper&: (True? (Empty? (Cons 5 2)))
+ > (True? (Empty? 
+            (λ (selector) ((selector 5) 2))))
+ > (True? 
+     ((λ (selector) ((selector 5) 2))
+       (λ (yes) (λ (no) False))))
+ > (True?
+     (((λ (yes) (λ (no) False))  5) 2))
+ > (True?
+      ((λ (no) False) 2))
+ > (True? False)
+ > 'no
+
+explanation: Now let's look at Empty?, more specifically, the selector
+that's provided to the list, (λ (yes) (λ (no) False)). This expression
+does not care what the two input yes and no is, it outputs False anyways.
+The reason is because if the list is Empty, it will be taken care of 
+right away due to the implementation of Empty as we've explained before.
+Therefore, as long as we need to evaluate this selector expression, it 
+means that the list is not Empty, so it outputs False.
+We consider the two element in the list as two arbitrary lambda 
+expression, which is why we need two variables.
+
+
+3.2 Binary numbers with lambda
+
+3.2.1 ADD1 / NAT / TAN
+
+we define zero in binary as:
+(define Z Empty) 
+    and
+(define Z? Empty?)
+
+We can look at the implementation of binary numbers from ADD1
+Racket:
+(define (ADD1 x)
+  (If (Z? x)
+      (Cons True Z)
+      (If (Car x) (Cons False (ADD1 (Cdr x)))
+          (Cons True (Cdr x)))))
+
+We work out the first few natural numbers 
+let True = 1, False = 0
+and observe that we will get a reverse list of binary representation
+1 = (ADD1 Z)
+(Cons True Empty)
+output: 1
+binary: 1
+
+2 = (ADD1 1)
+  = (ADD1 (ADD1 Z))
+&stepper&:
+(ADD1 1) 
+ >  (If (Car (Cons True Z)) 
+        (Cons False (ADD1 (Cdr (Cons True Z))))
+        (Cons True (Cdr (Cons True Z))))
+ >  (If True (Cons False (ADD1 (Cdr (Cons True Z))))
+        (Cons True (Cdr (Cons True Z))))
+ >  (Cons False (ADD1 (Cdr (Cons True Z))))
+ >  (Cons False (ADD1 Z))
+ >  (Cons False (Cons True Empty))
+output: 0 1
+binary: 1 0
+
+3 = (ADD1 2)
+  = (ADD1 (Cons False (Cons True Empty)))
+&stepper&:
+(ADD1 2)
+ >  (If (Car (Cons False (Cons True Empty))) 
+        (Cons False (ADD1 (Cdr (Cons False (Cons True Empty)))))
+        (Cons True (Cdr (Cons False (Cons True Empty)))))
+ >  (If False
+        (Cons False (ADD1 (Cons True Empty)))
+        (Cons True (Cons True Empty)))
+ >  (Cons True (Cons True Empty))
+output: 1 1
+binary: 1 1
+
+4 = (ADD1 3)
+  = (ADD1 (Cons True (Cons True Empty)))
+&stepper&:
+(ADD1 3)
+ >  (If (Car (Cons True (Cons True Empty))) 
+        (Cons False (ADD1 (Cdr (Cons True (Cons True Empty)))))
+        (Cons True (Cdr (Cons True (Cons True Empty)))))
+ >  (If True
+        (Cons False (ADD1 (Cons True Empty)))
+        (Cons False (Cons True Empty)))
+ >  (Cons False (ADD1 (Cons True Empty)))
+[Notice (ADD1 (Cons True Empty))
+      = (Cons False (Cons True Empty))
+      = (ADD1 1)
+      = 2
+ we left it as a practice for the reader to complete the stepper] 
+ >  (Cons False (Cons False (Cons True Empty)))
+output: 0 0 1
+binary: 1 0 0 
+
+explanation: in general, when we add 1 to binary numbers, 
+two cases may happen:
+if the last digit is 1[True], 
+    change the last digit to 0[False] and 
+    recursively call add1 to the rest of the digits until it reaches 0[False] or Z[Empty] case
+Racket code: (Cons False (ADD1 (Cdr x)))
+
+else the last digit is 0[False], we change the digit to 1[True]
+Racket code: (Cons True (Cdr x)))))
+
+eg.      1 1 0 0
+      +        1       (last digit from 0 to 1)
+      ----------
+         1 1 0 1
+
+       Z 1 1 1 1
+      +        1       (reaches Z[Empty] case)
+      -----------
+       1 0 0 0 0
+
+         1 0 1 1
+      +        1       (reaches 0[False] case)
+      ----------
+         1 1 0 0
+
+
+Now lets look at (TAN x) and (NAT x)
+
+Racket:
+(define (TAN x)
+  (If (Z? x) 0
+      (If (Car x) (add1 (* 2 (TAN (Cdr x)))) (* 2 (TAN (Cdr x))))))
+
+(define (NAT n)
+  (if (zero? n) Z (ADD1 (NAT (sub1 n)))))
+                
+An understanding of ADD1 helps us interpret (NAT x) and (TAN x)
+(NAT x) takes a natural number and recursive it construct it from Z
+(TAN x) takes a binary number and convert it to base 10 integers
+First, notice that if x is in the form of 0A, aka (Car x) = False
+then x = 2*A. The reason is when we add 0 in the front, in binary 
+representation of nutural numbers, we are adding 0 to the back, 
+which increases the corresponding 2^n by twice.
+eg. for 5 = 1 1 1
+            4 2 1 = 1*4 + 1*2 + 1*1 = 7
+adding 0 to the back, we have
+            1 1 1 0
+            8 4 2 1 = 1*8 + 1*4 + 1*2 + 0*1 = 14
+As for x in the form of 1A, we know 1A = 1 + 0A
+                                 so 1A = 1 + 2*A
+
+add1 a     |     result     |   meaning
+a=0                1             0+1 = 1
+a=0A               1A            2A + 1 = 1 + 2A
+a = 1A         0[add1 A]       (1+2A)+1 = 2+2A =0+2(A+1)
+
+For practice, write (SUB1 a)
+Racket:
+(define (SUB1 x)
+  (If (Z? x)
+      (error "undefined")
+      (If (Car x) (Cons False (Cdr x))
+          (Cons True (SUB1 (Cdr x))))))
+
+sub1 a     |       result         |   meaning
+a=0             undefined 
+               (0 convention)        
+a=0A            1[sub1 A]           0+2A -1= 2(A-1)+1
+a = 1A              0A              1+2A-1=2A   
+a = 1                0                  0
+
+
+3.2.2 ADD / MUL
+
+Now let's look at our implementation of ADD
+Racket:
+(define (ADD a b)
+  (If (Z? a) b
+   (If (Z? b) a
+    (If (Not (Car a)) (Cons (Car b) (ADD (Cdr a)(Cdr b)))
+     (If (Not (Car b)) (Cons (Car a) (ADD (Cdr a)(Cdr b)))
+       (Cons False (ADD1 (ADD (Cdr a)(Cdr b)))))))))
+
+if a=0 or b=0 return b or a
+else if a is in the form of 0A 
+        (the form of b does not matter, say xB)
+     then a + b = x(A+B)
+     else if b is in the form of 0B
+             (the form of a does not matter, say xA)
+     then a + b = x(A+B)
+          else (both a and b are in the form of 1A and 1B)
+          then a + b = 0(A+B+1)
+
+eg.      1 0 0 1  
+       +   1 1 1   
+       ---------
+       1 0 0 0 0
+
+=>       1 0 0    and   1 1 1     and add 0 
+        +  1 1         +    1       we have 1 0 0 0 0
+       --------        -------
+         1 1 1        1 0 0 0
+
+
+add a b          |       result           |    meaning
+a=0                         b
+b=0                         a
+a = 0A b = 0B          0[add A B]              2A+2B = 2[A+B]
+a = 1A b = 0B          1[add A B]              1+2A+2B = 1+2[A+B]
+a = 0A b = 1B          1[add A B]              2A+1+2B = 1+2[A+B]
+a = 1A b = 1B          0[add1 [add A B]]       1+2A+1+2B = 2+2A+2B = 2(1+A+B)
+
+Next, we look at our implementation of MUL
+
+Racket: 
+(define (MUL a b)
+  (If (Or (Z? a) (Z? b))
+      Z
+      (If (Car a) (ADD (MUL (Cons False (Cdr a)) b) b)
+          (Cons False (MUL (Cdr a) b)))))
+
+mul a b         |        result           |      meaning
+a = 0    b           0
+a = 0A   b           0 [mul A b]               2A*b = 2 (A*b)
+a = 1A   b          [add b [mul 0A b]]        (2A+1)b = 2A*b + b  
+  (or if A !=0)       0[mul A b]
+
+By now, it should be pretty clear how MUL works with the table above.
+By recursively calling MUL, we will eventually reach the base case.
+note that we have to check (Z? b) 
+     because if b=Z, we will get trailing zeroes as the outputs
+      which is not a binary number
+
+For practice, write (SUB a b) that outputs |b-a| [ie. sub a from b]
+(define (SUB a b)
+  (If (Z? a) b
+    (If (Z? b) a
+      (If (Not (Car a)) 
+        (If (Not (Car b)) (Cons False (SUB (Cdr a) (Cdr b)))
+            (Cons True (SUB (Cdr a) (Cdr b))))
+        (If (Car b) (Cons False (SUB (Cdr a) (Cdr b)))
+            (Cons True (SUB1 (SUB (Cdr a) (Cdr b)))))))))
+
+
+sub a b          |       result           |    meaning
+a=0                         b
+b=0                         a
+a = 0A b = 0B          0[sub A B]              2B-2A = 2[B-A]
+a = 0A b = 1B          1[sub A B]              1+2B-2A = 1+2[B-A]
+a = 1A b = 1B          0[sub A B]              (1+2B)-(1+2A) = 2[B-A]
+a = 1A b = 0B          1[sub1 [sub A B]]       2B-(1+2A) = 2(B-A)-1 = 2(B-A-1)+1

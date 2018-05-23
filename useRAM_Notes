@@ -1,0 +1,168 @@
+useRAM.rkt Notes
+
+Two ways to store integers at ram: 
+
+V1
+Racket:
+(define (int->Ram i)
+    (cond
+        [(>= i 0) (ram-store (ram-store ram 0 1) 1 0)]
+        [true (ram-store (ram-store ram 0 0) 1 (- i))]))
+
+explanation: 
+if i is non-negative we let [0] = i and [1] = 0
+if i is negative we let [0] = 0 and [1] = -i (= |i|)
+
+<<-->>
+
+Racket:
+(define (Ram->int r)
+    (- (ram-fetch r 0) (ram-fetch r 1)))
+
+explanation: 
+we can see why we define int->Ram as above from Ram->int
+there is no need for separate cases because
+if i is non-negative, (- [0] [1]) = (- i 0) = i
+if i is negative, (- [0] [1]) = (- 0 (-i)) = i
+
+V2
+Racket:
+(define (int->RAM n)
+    (if (< n 0) (ram-store ram 0 (- 1 (* 2 n)))
+                (ram-store ram 0 (* 2 n))))
+
+explanation: 
+we can look at is as a bijection from Z to N
+if n is non-negative, we let [0] = 2n
+if n is negative, we let [0] = 1 - 2n
+N: 0  1  2  3  4  5  6  7  8 ...
+Z: 0     1 -1  2 -2  3 -3  4 ...
+
+Racket:
+(define (RAM->int r)
+    (define w (ram-fetch r 0))
+    (if (odd? w) (- (quotient w 2)) (quotient w 2)))
+ 
+explanation: 
+we simply reverse the steps
+odd numbers represent negative integers
+even numbers represent non-negative integers
+[1] is not being used
+
+COMPARE:
+the second implementation is better than the first one
+because it only takes 1 position in ram -> less memory
+
+
+
+
+
+
+
+With V1, we also implemented add1, sub1, zero?
+Racket: 
+(define (Ram-add1 r)
+    (ram-store r 0 (add1 (ram-fetch r 0))))
+
+explanation: 
+if i is non-negative, we know [0] = i and [1] = 0
+    and now we let [0] = i + 1 
+        so [0] - [1] = i + 1 - 0 = i + 1
+if i is negative, we know [0] = 0 and [1] = -i
+    and now we let [0] = 0 + 1 = 1
+        so [0] - [1] = 1 -(-i) = i + 1
+
+Racket:
+(define (Ram-sub1 r)
+    (ram-store r 1 (add1 (ram-fetch r 0))))
+
+explanation: 
+if i is non-nagative, we know [0] = i and [1] = 0
+    and now we let [1] = 0 + 1 = 1
+        so [0] - [1] = i - 1
+if i is negative, we know [0] = 0 and [1] = -i
+    and now we let [1] = - i + 1
+        so [0] - [1] = 0 - (- i + 1) = i - 1
+
+
+Racket:
+(define (Ram-zero? r)
+    (= (ram-fetch r 0) (ram-fetch r 1)))
+
+explanation: 
+if i is non-negative, [1] = 0 
+ie (= [0] [1]) -> (= i 0)
+if i is negative, [0] = 0
+ie (= [0] [1]) -> (= 0 (-i))
+
+
+
+
+
+
+
+two ways to store list in ram:
+
+L1: 
+Racket:
+(define (ram-cons a b)
+    (ram-store (ram-store ram 0 a) 1 b))
+(define (ram-car r) (ram-fetch r 0))
+(define (ram-cdr r) (ram-fetch r 1))
+
+explanation: 
+this implementation is useless because it can only cons 2 integers
+eg. (cons 1 (cons 2 3)) produces error "attempt to store non-Nat value"
+because (cons 2 3) is not natural numbers
+
+L2:
+Racket:
+(define RAM-empty (ram-store ram 0 0))
+
+(define (RAM-cons a r)
+    (define len (ram-fetch r 0))
+    (define r1 (ram-store r (add1 len) a))
+    (define r2 (ram-store r1 0 (add1 len)))
+    r2)
+
+(define (RAM-car r)
+    (define len (ram-fetch r 0))
+    (ram-fetch r len))
+
+(define (RAM-cdr r)
+    (define len (ram-fetch r 0))
+    (ram-store r 0 (sub1 len)))
+
+&stepper&:
+
+(RAM-cons a RAM-empty)
+len = (ram-fetch RAM-empty 0) = 0
+r1 = (ram-store r (add1 len) a) -> [1] = a
+r2 = (ram-store r1 0 (add1 len)) -> [0] = 1, [1] = a
+
+(RAM-cons b (RAM-cons a RAM-empty))
+len = (ram-fetch (RAM-cons a RAM-empty) 0) -> 1
+r1 = (ram-store r (add1 len) b) -> [2] = b, [0] = 1, [1] = a
+r2 = (ram-store r1 0 (add1 len)) -> [0] = 2, [1] = a, [2] = b
+
+
+
+(RAM-car (RAM-cons b (RAM-cons a RAM-empty)))
+len = (ram-fetch (RAM-cons a RAM-empty) 0) -> 2
+(ram-fetch r len) -> [2] = b
+
+(RAM-cdr (RAM-cons b (RAM-cons a RAM-empty)))
+len = (ram-fetch (RAM-cons a RAM-empty) 0) -> 2
+(ram-store r 0 (sub1 len)) -> [0] = 2-1 = 1, [1] = a, [2] = b
+
+[RAM-cdr reduces len by 1, so we only get to look at the len-1 
+elements in ram]
+
+
+
+land of D rules for recursive functions:
+-- tail recursion only
+-- one parameter only -- must be RAM
+-- result must be RAM
+
+
